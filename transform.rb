@@ -14,18 +14,33 @@ class Album
   end
 
   def spotify_record
-    search_result = RSpotify::Artist.search(artist, market: 'US')
-    artist_matcher = FuzzyMatch.new(search_result, from: :name)
-    spotify_artist = artist_matcher.find(artist)
+    spotify_album = RSpotify::Album.search(album, market: 'US').first
+    if spotify_album.nil?
+      search_result = RSpotify::Artist.search(artist, market: 'US')
+      artist_matcher = FuzzyMatch.new(search_result, from: :name)
+      spotify_artist = artist_matcher.find(artist)
+      if spotify_artist.nil?
+        spotify_artist = search_result.first
+      end
+      puts "#{spotify_artist.name} was chosen"
 
-    album_matcher = FuzzyMatch.new(spotify_artist.album, from: :name)
-    spotify_album = album_matcher.find(album)
+      album_matcher = FuzzyMatch.new(spotify_artist.albums, from: :name)
+      spotify_album = album_matcher.find(album)
+
+      if spotify_album.nil?
+        spotify_album = spotify_artist.albums.first
+      end
+    end
 
     spotify_album
+  rescue => e
+    puts "ERROR! #{e.class.name}: #{e.message}"
+    nil
   end
 
   def post
-    if spotify_record.nil?
+    record = spotify_record
+    if record.nil?
       puts  "Not found #{album}"
       return
     end
@@ -34,15 +49,15 @@ class Album
       'comments' => true,
       'title' => post_title,
     }
-    unless spotify_record.images.empty?
-      image = spotify_record.images.max{ |h| h['height'] }
+    unless record.images.empty?
+      image = record.images.max{ |h| h['height'] }
       front_matter_hash['cover_url'] = image['url']
       front_matter_hash['cover_width'] = image['width']
       front_matter_hash['cover_height'] = image['height']
     end
 
     yaml_front = YAML.dump(front_matter_hash) + "---\n"
-    body = spotify_record.embed + "\n"
+    body = record.embed + "\n"
     File.open('./out/' + filename, 'w') { |f| f.write(yaml_front + body) }
     puts "wrote file #{filename}"
   end
