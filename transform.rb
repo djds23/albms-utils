@@ -1,6 +1,7 @@
 require 'json'
 require 'yaml'
 require 'rspotify'
+require 'fuzzy_match'
 require 'time'
 
 class Album
@@ -12,8 +13,18 @@ class Album
     puts date, artist, album
   end
 
+  def spotify_record
+    search_result = RSpotify::Artist.search(artist, market: 'US')
+    artist_matcher = FuzzyMatch.new(search_result, from: :name)
+    spotify_artist = artist_matcher.find(artist)
+
+    album_matcher = FuzzyMatch.new(spotify_artist.album, from: :name)
+    spotify_album = album_matcher.find(album)
+
+    spotify_album
+  end
+
   def post
-    spotify_record = RSpotify::Album.search(album, market: 'US').first
     if spotify_record.nil?
       puts  "Not found #{album}"
       return
